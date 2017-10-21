@@ -1,0 +1,78 @@
+#!/bin/bash
+#
+# weatherreport-notresilient	Script to start non-resilient version of weatherreport API
+#
+# chkconfig: 35 90 10
+# description:  Starts and stops weatherreport API
+# short-description:  Starts and stops weatherreport API
+
+# Source function library.
+. /etc/init.d/functions
+
+JAVA=/usr/bin/java
+APPNAME=weatherreport-notresilient
+APPDIR=/home/ec2-user/weatherreport
+PIDFILE=/var/run/$APPNAME.pid
+LOGFILE=/var/log/$APPNAME
+LOCKFILE=/var/lock/subsys/$APPNAME
+
+EXEC="$JAVA -cp src/main/resources -jar -Dspring.profiles.active=dev -Dspring.config.name=$APPNAME build/libs/weatherreport.jar"
+
+start() {
+	touch $LOGFILE $PIDFILE
+	echo -n $"Starting $APPNAME: "
+
+	pushd $APPDIR
+	daemon \
+		--pidfile=$PIDFILE \
+		--check=$APPNAME \
+		"$EXEC" \
+		">>" \
+		"$LOGFILE" \
+		"2>&1" \
+		"&"
+
+	RETVAL=$?
+	echo
+
+	if [ $RETVAL -eq 0 ]; then
+		touch $LOCKFILE 
+		echo `pidofproc $EXEC` > $PIDFILE
+	fi
+
+	return $RETVAL
+}
+
+stop() {
+	echo -n $"Shutting down $APPNAME: "
+	killproc -p $PIDFILE $APPNAME
+	RETVAL=$?
+	echo
+	[ $RETVAL -eq 0 ] && rm -f $LOCKFILE
+	return $RETVAL
+}
+
+# See how we were called.
+case "$1" in
+  start)
+	start
+	;;
+  stop)
+	stop
+	;;
+  status)
+	status -p $PIDFILE $APPNAME
+	;;
+  restart)
+	stop
+	start
+	;;
+  *)
+	# do not advertise unreasonable commands that there is no reason
+	# to use with this device
+	#echo $"Usage: $0 {start|stop|status|restart|reload|force-reload}"
+	echo $"Usage: $0 {start|stop|status|restart}"
+	exit 1
+esac
+exit $?
+
